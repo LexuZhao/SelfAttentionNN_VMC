@@ -1,2 +1,2 @@
 # SelfAttentionNN_VMC
-Self Attention Neural Network with Variational Monte Carlo
+Self Attention Neural Network with Variational Monte Carlo in Correlated Electron Problem
