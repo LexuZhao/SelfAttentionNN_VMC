@@ -54,7 +54,7 @@ class VMC:
         return kinetic + self.E0(R)
 
     # ---------- one optimisation epoch ----------
-    def step(self, n_cfg=400, lr=1e-4, clip=100.0):
+    def step(self, n_cfg=2000, lr=1e-5, clip=100.0):
         """Perform one optimisation epoch: sample n_cfg configurations, compute the local energy and
         its derivatives, and update the variational parameters using stochastic gradient descent."""
         cfgs = self.sample(n_cfg=n_cfg)
