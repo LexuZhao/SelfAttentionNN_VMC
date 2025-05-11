@@ -1,4 +1,4 @@
-# SelfAttentionNN_VMC
+# SelfAttentionNN_VMC_Correlated_Electron_problem
 
 Self Attention Neural Network with Variational Monte Carlo in Correlated Electron Problem
 
