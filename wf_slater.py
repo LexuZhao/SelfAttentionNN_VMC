@@ -19,17 +19,17 @@ class SlaterWF:
         self.params = np.empty(0)                 # no trainable params
 
     # ----- single-orbital helpers ---------------------------------------
-    def _phi(self, k, r):            # φ(r)
-        return np.cos(k.dot(r))
+    def _phi(self, k, r):            #  φₖ(r) = cos(k · r)
+        return np.cos(k.dot(r))     
 
-    def _grad_phi(self, k, r):       # ∇φ(r)
+    def _grad_phi(self, k, r):       # ∇ₙ φ = ∂/∂r [cos(k·r)] = -sin(k·r)·k
         return -np.sin(k.dot(r)) * k
 
-    def _lap_phi(self, k, r):        # ∇²φ(r)
+    def _lap_phi(self, k, r):        # ∇²φ = -|k|² cos(k·r)
         return -np.dot(k,k) * np.cos(k.dot(r))
 
     # ----- Slater-matrix & its inverse ----------------------------------
-    def _matrix(self, R):
+    def _matrix(self, R): # R is an array of shape (N_e,2): positions of each electron
         M = np.empty((self.N_e, self.N_e))
         for i, r in enumerate(R):
             for j, k in enumerate(self.kvecs):
@@ -37,13 +37,11 @@ class SlaterWF:
         return M
 
     # ----- API required by vmc_core.py ----------------------------------
-    def log_psi(self, R):
-        # ln|det| – we drop the overall sign; it cancels in |Ψ|²
+    def log_psi(self, R): # ln|det| – we drop the overall sign; it cancels in |Ψ|²
         sign, logdet = np.linalg.slogdet(self._matrix(R))
         return logdet
 
-    def grad_log_psi(self, R):
-        # ∇_i lnΨ = Σ_j (∇_i φ_j) (M⁻¹)_{j,i}
+    def grad_log_psi(self, R): # ∇_i lnΨ = Σ_j (∇_i φ_j) (M⁻¹)_{j,i} for each electron i
         M    = self._matrix(R)
         Minv = np.linalg.inv(M)
         grad = np.zeros((self.N_e, 2))
@@ -63,7 +61,6 @@ class SlaterWF:
                 lapl += self._lap_phi(k, r) * Minv[j, i]
         return lapl                      # scalar
 
-    def param_derivatives(self, cfgs):
-        # no variational parameters → derivative = 0
+    def param_derivatives(self, cfgs): # no variational parameters → derivative = 0
         n_cfg = len(cfgs)
         return np.zeros((n_cfg, 0))
