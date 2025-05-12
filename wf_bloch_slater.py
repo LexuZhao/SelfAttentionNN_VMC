@@ -1,4 +1,4 @@
-# wf_bloch.py -  A Bloch-determinant wave-function compatible with VMC
+# wf_bloch_slater.py -  A Bloch-determinant wave-function compatible with VMC
 import numpy as np, pickle
 
 class BlochSlaterWF:
