@@ -2,15 +2,19 @@
 import numpy as np
 
 def hexagonal_fermi_sea(N_e, a_m):
-    """
-    Return the N_e lowest-|k| wave-vectors of a 2-D free electron gas
-    on the triangular lattice, i.e. a perfect hexagonal Fermi disc.
-    Spinless electrons, so we need exactly N_e orbitals.
-    """
+    """ Input: N_e = number of electrons (or orbitals) to fill
+    Output: k-vectors of the filled orbitals in a hexagonal Fermi sea.
+
+    This code constructs all reciprocal-lattice momenta k = n1b1 + n2b2 up to some shell, sorts them by ∣k∣, 
+    and picks the lowest- ∣k∣ of them—thereby selecting the plane-wave eigenstates that minimize the 
+    non-interacting KE, ℏ^2∣k∣^2/2m, i.e. filling a perfect hexagonal Fermi sea."""
+    
+    #Defines the two basis vectors of the triangular reciprocal lattice.
     g = 4*np.pi/(np.sqrt(3)*a_m)         # |b1|
     b1 = np.array([g, 0.0])
     b2 = np.array([g/2, g*np.sqrt(3)/2])
 
+    # grow out shells until we have enough k-vectors
     shell = 0
     k_list = []
     while len(k_list) < N_e:
