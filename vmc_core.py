@@ -28,11 +28,11 @@ class VMC:
     def _metro_step(self, R, delta):
         """using Metropolis–Hastings to draw random e config according to our wf's probability density,
         so that we can estimate energies and their derivatives by simple averages over those config."""
-        logp0 = 2.0 * self.wf.log_psi(R)    # ln |Ψ|²
+        logp0 = 2.0 * self.wf.log_psi(R).real    # ln |Ψ|²
         for i in range(len(R)):
             trial = R.copy()
             trial[i] = (R[i] + np.random.uniform(-delta, delta, 2)) % self.L
-            logp1 = 2.0 * self.wf.log_psi(trial)
+            logp1 = 2.0 * self.wf.log_psi(trial).real # real because we only need |Ψ|²
             if np.log(np.random.rand()) < (logp1 - logp0):
                 R[i] = trial[i]; logp0 = logp1
         return R
@@ -47,21 +47,47 @@ class VMC:
         return np.array(cfgs) # Return an array of shape (n_steps – burn, N_e, 2) returns the remaining sampled config as an array.
 
     # ---------- local-energy helper ----------
+    # def local_energy(self, R):
+    #     grad = self.wf.grad_log_psi(R)           # (N,2)
+    #     lap  = self.wf.laplacian_log_psi(R)      # scalar
+    #     kinetic = -self.h2m * (lap + (grad**2).sum())
+    #     return kinetic + self.E0(R)
+
     def local_energy(self, R):
-        grad = self.wf.grad_log_psi(R)           # (N,2)
-        lap  = self.wf.laplacian_log_psi(R)      # scalar
-        kinetic = -self.h2m * (lap + (grad**2).sum())
-        return kinetic + self.E0(R)
+        """Compute the local energy at configuration R."""
+        # Note: the wavefunction is complex, so we need to be careful with the signs.
+        grad = self.wf.grad_log_psi(R)          # complex (N,2)
+        lap  = self.wf.laplacian_log_psi(R)     # complex scalar
+        grad2 = (grad.conj()*grad).sum()        # |∇lnΨ|²  (real ≥0)
+        kinetic = -self.h2m * (lap + grad2)     # still complex (≈ real)
+        return kinetic.real + self.E0(R)        # guarantee real energy
 
     # ---------- one optimisation epoch ----------
+    # def step(self, n_cfg=2000, lr=1e-5, clip=100.0):
+    #     """Perform one optimisation epoch: sample n_cfg configurations, compute the local energy and
+    #     its derivatives, and update the variational parameters using stochastic gradient descent."""
+    #     cfgs = self.sample(n_cfg=n_cfg)
+    #     E_loc = np.array([self.local_energy(R) for R in cfgs]) # real
+    #     deriv = self.wf.param_derivatives(cfgs)  # shape (n_cfg, n_param)
+    #     Obar  = deriv.mean(axis=0)
+
+    #     grad  = 2.0*( (E_loc[:,None]*deriv).mean(axis=0) - E_loc.mean()*Obar )
+    #     grad  = np.clip(grad, -clip, clip)
+    #     self.wf.params -= lr * grad
+    #     return E_loc.mean(), grad, self.wf.params.copy()
+    
     def step(self, n_cfg=2000, lr=1e-5, clip=100.0):
-        """Perform one optimisation epoch: sample n_cfg configurations, compute the local energy and
-        its derivatives, and update the variational parameters using stochastic gradient descent."""
-        cfgs = self.sample(n_cfg=n_cfg)
-        E_loc = np.array([self.local_energy(R) for R in cfgs])
-        deriv = self.wf.param_derivatives(cfgs)  # shape (n_cfg, n_param)
-        Obar  = deriv.mean(axis=0)
-        grad  = 2.0*( (E_loc[:,None]*deriv).mean(axis=0) - E_loc.mean()*Obar )
+        cfgs  = self.sample(n_cfg=n_cfg)
+        E_loc = np.array([self.local_energy(R) for R in cfgs])      # real
+        deriv = self.wf.param_derivatives(cfgs)                     # complex
+        Obar  = deriv.mean(axis=0)                                  # complex
+
+        #   grad = 2 Re[ ⟨O* E_loc⟩  - ⟨O*⟩⟨E_loc⟩ ]
+        cov   = (E_loc[:,None] * deriv.conj()).mean(axis=0) - E_loc.mean()*Obar.conj()
+        grad  = 2.0 * cov.real                                      # real params
         grad  = np.clip(grad, -clip, clip)
+
         self.wf.params -= lr * grad
+        if hasattr(self.wf, "sync_params_from_numpy"):
+            self.wf.sync_params_from_numpy(self.wf.params)
         return E_loc.mean(), grad, self.wf.params.copy()

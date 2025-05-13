@@ -1,4 +1,4 @@
-# wf_slater.py
+# wf_slater.py - Slater determinant of *real* orbitals φ_k(r)=cos(k·r)
 import numpy as np
 
 class SlaterWF:

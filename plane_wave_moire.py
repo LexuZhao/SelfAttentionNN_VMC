@@ -53,4 +53,5 @@ def build_Hk(k, G_list, idx_map, a_m, V0, phi=0.0, hbar2_over_2m=0.5):
                 H[i,j] += coeff
     return H
 
+print("code runned")
 # Note: The Hamiltonian is Hermitian, so we only need to fill the upper triangle.
