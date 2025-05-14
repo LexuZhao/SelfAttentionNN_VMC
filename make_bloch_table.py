@@ -2,19 +2,18 @@
 # If we want spin-degeneracy or multiple bands just pick more columns of "eigvec"
 import numpy as np
 import pickle
-from plane_wave_moire import build_Hk
-from plane_wave_moire import build_G_basis
-from k_selection import hexagonal_fermi_sea
+from plane_wave_moire import build_Hk, build_G_basis
+from k_selection import occupied_k_points
 from moire_model import a_m, V0, hbar2_over_2m, phi
 # a_m   = 8.5
 # V0    = 15.0
 cut   = 2               # |G|≤cut·|g|
-N_e   = 9               # # electrons (= # occupied orbitals)
+N_e   = 6               # # electrons (= # occupied orbitals)
 # phi = 0.0   # phase of the moiré potential, doesn't matter for E spectrum, safely set it to 0
 # hbar2_over_2m = 0.5
 
 
-kvecs = hexagonal_fermi_sea(N_e, a_m)
+kvecs = occupied_k_points(N_e, a_m)
 G_list, idx_map = build_G_basis(cut, a_m) # plane-wave basis (same as dispersion script)
 NG = len(G_list)    # Hamiltonian size: HG times N_e
 

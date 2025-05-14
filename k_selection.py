@@ -1,36 +1,69 @@
-# k_selection.py - Fill a hexagonal Fermi sea (free electrons)
+# k_selection.py
 import numpy as np
-from moire_model import reciprocal_vectors
+from moire_model import b_vectors, a_m        # import the same a_m
 
-def hexagonal_fermi_sea(N_e, a_m):
-    """ Input: N_e = number of electrons (or orbitals) to fill
-    Output: k-vectors of the filled orbitals in a hexagonal Fermi sea.
 
-    This code constructs all reciprocal-lattice momenta k = n1b1 + n2b2 up to some shell, sorts them by ∣k∣, 
-    and picks the lowest- ∣k∣ of them—thereby selecting the plane-wave eigenstates that minimize the 
-    non-interacting KE, ℏ^2∣k∣^2/2m, i.e. filling a perfect hexagonal Fermi sea."""
-    
-    # basis vectors for triangular reciprocal lattice.
-    b1, b2, _ = reciprocal_vectors(a_m)
+def occupied_k_points(N_e, n_sup=3):
+    """
+    3×3 super-cell ⇒ k = (n1/n_sup) b1 + (n2/n_sup) b2  with n1,n2 = 0,1,2.
+    Return the N_e lowest-|k| vectors (Γ + first hexagon).
+    """
+    b1, b2, _ = b_vectors(a_m)
 
-    # grow out shells until we have enough k-vectors
-    shell = 0
-    k_list = []
-    while len(k_list) < N_e:
-        # iterate over all integer pairs (n1,n2) with |n1|+|n2| ≤ shell
-        for n1 in range(-shell, shell+1):
-            for n2 in range(-shell, shell+1):
-                if abs(n1)+abs(n2) > shell:   # stay on current shell
-                    continue
-                k = n1*b1 + n2*b2
-                k_list.append(k)
-        shell += 1
-
+    full_mesh = [(n1/n_sup)*b1 + (n2/n_sup)*b2
+                 for n1 in range(n_sup) for n2 in range(n_sup)]   # 9 vectors
+    full_mesh = np.array(full_mesh)
     # sort by |k| and pick the first N_e
-    k_list.sort(key=lambda q: np.linalg.norm(q))
-    return np.array(k_list[:N_e])         # shape (N_e,2)
+    idx = np.argsort(np.linalg.norm(full_mesh, axis=1))
+    return full_mesh[idx[:N_e]]
 
-# quick demo
+# quick demo: paper uses N_e = 6
 if __name__ == "__main__":
-    ks = hexagonal_fermi_sea(6, a_m=8.5)
-    for v in ks: print(v)
+    for k in occupied_k_points(6):
+        print(k)
+
+
+
+
+# # Fill a hexagonal Fermi sea (free electrons)
+# def hexagonal_fermi_sea(N_e, a_m):
+#     """
+#     Return N_e distinct crystal-momentum vectors that fill a hexagonal Fermi
+#     sea on the triangular reciprocal lattice (spin-polarised case).
+
+#     Each k is of the form k = n1*b1 + n2*b2 where (b1,b2) are the reciprocal
+#     primitive vectors of the moiré super-lattice.  Vectors are generated in
+#     concentric ‘hexagonal shells’ and sorted by |k| so the lowest-kinetic-
+#     energy states are chosen first.
+#     """
+#     # primitive reciprocal vectors (2D)
+#     b1, b2, _ = b_vectors(a_m)
+
+#     k_list = []
+#     seen    = set()          # holds tuples (n1, n2) already added
+#     shell   = 0
+
+#     while len(k_list) < N_e:
+#         for n1 in range(-shell, shell + 1):
+#             for n2 in range(-shell, shell + 1):
+#                 if abs(n1) + abs(n2) > shell:      # stay on current shell
+#                     continue
+#                 if (n1, n2) in seen:               # skip duplicates (e.g. Γ)
+#                     continue
+
+#                 seen.add((n1, n2))
+#                 k_vec = n1 * b1 + n2 * b2
+#                 k_list.append(k_vec)
+
+#         shell += 1
+
+#     # sort by |k| and keep the first N_e
+#     k_list.sort(key=lambda q: np.linalg.norm(q))
+#     return np.array(k_list[:N_e])      # shape (N_e, 2)
+
+# # to reproduce 3by3 moiré superlattice with 2/3 filling factor: N_e = 3*3*2/3 = 6
+# # quick demo
+# if __name__ == "__main__":
+#     ks = hexagonal_fermi_sea(6, a_m=8.5)
+#     for v in ks:
+#         print(v)

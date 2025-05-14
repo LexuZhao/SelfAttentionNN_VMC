@@ -9,7 +9,7 @@ from math import erfc, sqrt, pi, exp
 import numpy as np
 
 # -------- user-adjustable constants --------
-a_m   = 8.5          # nm   moiré lattice constant
+a_m   = 8.5          # nm   moiré lattice constant, supercell length
 V0    = 15.0         # meV  potential depth
 eps_r = 10.0         # dielectric constant
 e2_4pieps0 = 14.399645  # meV·nm (|e|²/4πϵ0)
@@ -21,20 +21,40 @@ phi = 0.0              # phase of the moiré potential, doesn't matter for E spe
 ew_alpha = 0.35      # nm⁻²  (splitting)
 r_cut    = 2.5       # real-space cutoff in L units
 k_cut    = 5         # k-space cutoff in 2π/L units
-L        = a_m       # moiré supercell length (L = a_m)
+n_sup = 3            # 3×3 super-cell
+L     = n_sup * a_m  # nm   PBC box length used in Ewald
 
-# ---------- reciprocal lattice ----------
-def reciprocal_vectors(a):
-    """Generates the 3 shortest moiré reciprocal vectors G_1,2,3, 60° apart, six-fold symmetry"""
-    g = 4*np.pi/(np.sqrt(3)*a) #(length |G|=4π/√3a)
-    G1 = np.array([g,0.0]) # first vector along x-axis
-    rot = lambda v,ang: np.array([np.cos(ang)*v[0]-np.sin(ang)*v[1], # rotate G1 by +60°, get G2
-                                  np.sin(ang)*v[0]+np.cos(ang)*v[1]]) # rotate G1 by –60°, get G3
-    return np.stack([G1, rot(G1, np.pi/3), rot(G1,-np.pi/3)])
-G = reciprocal_vectors(a_m)
+# 1. primitive real-space moiré lattice
+def a_vectors(a_m):
+    a1 = a_m * np.array([1.0, 0.0])
+    a2 = a_m * np.array([0.5, np.sqrt(3.0)/2])
+    return a1, a2
+
+# # ---------- reciprocal lattice ----------
+# def reciprocal_vectors(a):
+#     """Generates the 3 shortest moiré reciprocal vectors G_1,2,3, 60° apart, six-fold symmetry"""
+#     g = 4*np.pi/(np.sqrt(3)*a) #(length |G|=4π/√3a)
+#     G1 = np.array([g,0.0]) # first vector along x-axis
+#     rot = lambda v,ang: np.array([np.cos(ang)*v[0]-np.sin(ang)*v[1], # rotate G1 by +60°, get G2
+#                                   np.sin(ang)*v[0]+np.cos(ang)*v[1]]) # rotate G1 by –60°, get G3
+#     return np.stack([G1, rot(G1, np.pi/3), rot(G1,-np.pi/3)])
+# G = reciprocal_vectors(a_m)
+
+# primitive reciprocal lattice vectors
+def b_vectors(a_m):
+    b1 = (2*np.pi/a_m) * np.array([ 1.0, -1/np.sqrt(3.0) ])
+    b2 = (2*np.pi/a_m) * np.array([ 0.0, 2/np.sqrt(3.0) ])
+    b3 = -(b1+b2)
+    return b1, b2, b3
+
+# real-space vectors of an n×n super-cell   (n = 3 here since we have 3x3 supercell)
+def supercell_vectors(n, a_m):
+    a1, a2 = a_vectors(a_m)
+    return n*a1, n*a2
 
 def moire_potential(r):
     """V_ext(r) = V0 * Σ cos(G·r)  (sum over G vectors)"""
+    G = np.array([b_vectors(a_m)[0], b_vectors(a_m)[1], b_vectors(a_m)[2]]) # 3 G vectors
     return V0 * np.sum(np.cos(r @ G.T), axis=-1)
 
 # ---------- Ewald helpers (using ew_alpha) ----------
@@ -95,8 +115,48 @@ def energy_static(R):
 # alias for backward compatibility
 energy_moire = energy_static
 
-# ---------- smoke-test ----------
-if __name__ == "__main__":
-    np.random.seed(0)
-    R = np.random.rand(6,2)*a_m
-    print("static part =", energy_static(R), "meV")
+# # ---------- smoke-test ----------
+# if __name__ == "__main__":
+#     np.random.seed(0)
+#     R = np.random.rand(6,2)*a_m
+#     print("static part =", energy_static(R), "meV")
+
+
+
+
+# ------------------------------------------------------------------------------
+print("== Unit tests for energy_static =========================================")
+
+# 1. single electron at Γ (no e–e term)
+r0 = np.array([[0.0, 0.0]])
+print("1-electron Γ-point :",
+      energy_static(r0), "meV   (should equal V_ext at Γ)")
+
+# 2. two electrons opposite corners of the super-cell  (max. separation L√2/2)
+r2 = np.array([[0.0, 0.0],
+               [0.5*L, 0.5*L]])        # nm
+E2_ext = moire_potential(r2).sum()
+E2_ee  = coulomb_ewald_2D(r2)
+print("2-electron test     : ext =", E2_ext, "  Coul =", E2_ee,
+      "  total =", energy_static(r2), "meV")
+
+# 3. six electrons at random positions in the 3×3 box  (paper’s occupation)
+np.random.seed(0)
+r6 = np.random.rand(6, 2) * L
+print("6-electron random   :", energy_static(r6), "meV")
+print("coordinates (nm):\n", r6)
+
+# 4. translational invariance check (shift by L/3, L/7)
+shift = np.array([L/3, L/7])       # arbitrary lattice-vector shift
+print("translational check :", energy_static(r6),
+      " ≟ ", energy_static(r6+shift))
+
+# 5. translational invariance check (shift by a1, a2)
+a1, a2 = a_vectors(a_m)
+shift  = 2*a1 - 1*a2          # any integer combination works
+print("translational check2: ",energy_static(r6), energy_static(r6+shift))  # should match to 1e-8
+# Now the two numbers will coincide, confirming full PBC consistency.
+
+
+
+
