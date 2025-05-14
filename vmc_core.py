@@ -61,6 +61,9 @@ class VMC:
         grad2 = (grad.conj()*grad).sum()        # |∇lnΨ|²  (real ≥0)
         kinetic = -self.h2m * (lap + grad2)     # still complex (≈ real)
         return kinetic.real + self.E0(R)        # guarantee real energy
+# “H acting on the Slater determinant” is executed every time local_energy() is called
+
+
 
     # ---------- one optimisation epoch ----------
     # def step(self, n_cfg=2000, lr=1e-5, clip=100.0):
