@@ -1,5 +1,6 @@
 # k_selection.py - Fill a hexagonal Fermi sea (free electrons)
 import numpy as np
+from moire_model import reciprocal_vectors
 
 def hexagonal_fermi_sea(N_e, a_m):
     """ Input: N_e = number of electrons (or orbitals) to fill
@@ -9,10 +10,8 @@ def hexagonal_fermi_sea(N_e, a_m):
     and picks the lowest- ∣k∣ of them—thereby selecting the plane-wave eigenstates that minimize the 
     non-interacting KE, ℏ^2∣k∣^2/2m, i.e. filling a perfect hexagonal Fermi sea."""
     
-    #Defines the two basis vectors of the triangular reciprocal lattice.
-    g = 4*np.pi/(np.sqrt(3)*a_m)         # |b1|
-    b1 = np.array([g, 0.0])
-    b2 = np.array([g/2, g*np.sqrt(3)/2])
+    # basis vectors for triangular reciprocal lattice.
+    b1, b2, _ = reciprocal_vectors(a_m)
 
     # grow out shells until we have enough k-vectors
     shell = 0

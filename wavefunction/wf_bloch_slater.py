@@ -1,4 +1,10 @@
 # wf_bloch_slater.py -  A Bloch-determinant wave-function compatible with VMC
+
+# important to note:
+# “Plain Bloch Slater” is not an exact interacting ground-state wf,
+# but it is a good approx for the ground-state of a non-interacting system.
+# It is a reference trial wf derived from a one-body ED.
+
 import numpy as np, pickle
 
 class BlochSlaterWF:

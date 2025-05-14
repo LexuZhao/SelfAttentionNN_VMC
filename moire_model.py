@@ -1,4 +1,5 @@
 # moire_model.py # latex notes in colab
+
 # This code computes the total static energy (in meV) of a set of unit‐charges (e.g. electrons) 
 # in a 2D moiré superlattice: the energy_static(R) function takes an array of particle positions 
 # R (in nm) and returns the sum of the external moiré potential energy and the electron–electron 
@@ -12,12 +13,15 @@ a_m   = 8.5          # nm   moiré lattice constant
 V0    = 15.0         # meV  potential depth
 eps_r = 10.0         # dielectric constant
 e2_4pieps0 = 14.399645  # meV·nm (|e|²/4πϵ0)
+hbar2_over_2m = 0.5
+phi = 0.0              # phase of the moiré potential, doesn't matter for E spectrum, safely set it to 0
+
 
 # --- Ewald parameters (renamed) ---
 ew_alpha = 0.35      # nm⁻²  (splitting)
 r_cut    = 2.5       # real-space cutoff in L units
 k_cut    = 5         # k-space cutoff in 2π/L units
-L        = a_m
+L        = a_m       # moiré supercell length (L = a_m)
 
 # ---------- reciprocal lattice ----------
 def reciprocal_vectors(a):
