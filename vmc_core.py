@@ -1,5 +1,6 @@
 # vmc_core.py - engine that knows nothing about the ansatz Ψ
 import numpy as np
+from moire_model import L, hbar2_over_2m # (box length) # L
 
 # This code defines a generic VMC engine: it requires a Ψ that implements log_psi(R), grad_log_psi(R), 
 # laplacian_log_psi(R) and param_derivatives(cfgs), plus a static energy function E0(R) (moire_energy we had). 
@@ -7,18 +8,15 @@ import numpy as np
 # -hbar2_over_2m * (∇² lnΨ + |∇ lnΨ|²) and the moire_energy we had, and then updates the variational parameters via
 # stochastic gradient descent on the estimated expectation value of the energy.
 
+
 class VMC:
-    """
-    Generic variational-Monte-Carlo engine.
-    The wavefunction object must implement:
+    """ Generic variational-Monte-Carlo engine.The wavefunction object must implement:
         • log_psi(R)           -> scalar
         • grad_log_psi(R)      -> (N,2) array  (∇_i lnΨ)
         • laplacian_log_psi(R) -> scalar       (Σ_i ∇²_i lnΨ)
     and expose a mutable .params attribute that the optimiser can update.
     """
-
-    def __init__(self, wavefunction, energy_static,
-                 hbar2_over_2m=3500.0, box_length=8.5):
+    def __init__(self, wavefunction, energy_static, hbar2_over_2m = hbar2_over_2m, box_length= L):
         self.wf   = wavefunction
         self.E0   = energy_static   # external+Coulomb (R-only) its exactly the old "energy_moire(R)"
         self.h2m  = hbar2_over_2m
@@ -37,9 +35,11 @@ class VMC:
                 R[i] = trial[i]; logp0 = logp1
         return R
 
+
     def sample(self, n_cfg=400, burn=200, delta=0.3):
+        """Sample n_cfg configurations using Metropolis–Hastings."""
         R = np.random.rand(self.wf.N_e, 2) * self.L # Initialize R with N_e electrons at random positions in [0, L)×[0, L)
-        cfgs=[] # List to collect post-burn-in configurations
+        cfgs=[]
         for t in range(n_cfg+burn): # Perform n_steps Metropolis–Hastings sweeps
             R = self._metro_step(R, delta)
             if t >= burn:
@@ -47,43 +47,25 @@ class VMC:
         return np.array(cfgs) # Return an array of shape (n_steps – burn, N_e, 2) returns the remaining sampled config as an array.
 
     # ---------- local-energy helper ----------
-    # def local_energy(self, R):
-    #     grad = self.wf.grad_log_psi(R)           # (N,2)
-    #     lap  = self.wf.laplacian_log_psi(R)      # scalar
-    #     kinetic = -self.h2m * (lap + (grad**2).sum())
-    #     return kinetic + self.E0(R)
-
     def local_energy(self, R):
         """Compute the local energy at configuration R."""
-        # Note: the wavefunction is complex, so we need to be careful with the signs.
         grad = self.wf.grad_log_psi(R)          # complex (N,2)
         lap  = self.wf.laplacian_log_psi(R)     # complex scalar
-        grad2 = (grad.conj()*grad).sum()        # |∇lnΨ|²  (real ≥0)
-        kinetic = -self.h2m * (lap + grad2)     # still complex (≈ real)
+        # grad2 = (grad.conj()*grad).sum()        # |∇lnΨ|²  (real ≥0)
+        grad2 = np.dot(grad, grad)         # no .conj()
+
+        kinetic = -self.h2m * (lap + grad2)     # energy operator acting on the wavefunction
         return kinetic.real + self.E0(R)        # guarantee real energy
-# “H acting on the Slater determinant” is executed every time local_energy() is called
-
-
+    # “H acting on the Slater determinant” is executed every time local_energy() is called
+    # fix 
 
     # ---------- one optimisation epoch ----------
-    # def step(self, n_cfg=2000, lr=1e-5, clip=100.0):
-    #     """Perform one optimisation epoch: sample n_cfg configurations, compute the local energy and
-    #     its derivatives, and update the variational parameters using stochastic gradient descent."""
-    #     cfgs = self.sample(n_cfg=n_cfg)
-    #     E_loc = np.array([self.local_energy(R) for R in cfgs]) # real
-    #     deriv = self.wf.param_derivatives(cfgs)  # shape (n_cfg, n_param)
-    #     Obar  = deriv.mean(axis=0)
-
-    #     grad  = 2.0*( (E_loc[:,None]*deriv).mean(axis=0) - E_loc.mean()*Obar )
-    #     grad  = np.clip(grad, -clip, clip)
-    #     self.wf.params -= lr * grad
-    #     return E_loc.mean(), grad, self.wf.params.copy()
-    
     def step(self, n_cfg=2000, lr=1e-5, clip=100.0):
+        """Perform one optimisation step using stochastic gradient descent."""
         cfgs  = self.sample(n_cfg=n_cfg)
-        E_loc = np.array([self.local_energy(R) for R in cfgs])      # real
-        deriv = self.wf.param_derivatives(cfgs)                     # complex
-        Obar  = deriv.mean(axis=0)                                  # complex
+        E_loc = np.array([self.local_energy(R) for R in cfgs])
+        deriv = self.wf.param_derivatives(cfgs)                     
+        Obar  = deriv.mean(axis=0)                                                                    
 
         #   grad = 2 Re[ ⟨O* E_loc⟩  - ⟨O*⟩⟨E_loc⟩ ]
         cov   = (E_loc[:,None] * deriv.conj()).mean(axis=0) - E_loc.mean()*Obar.conj()
