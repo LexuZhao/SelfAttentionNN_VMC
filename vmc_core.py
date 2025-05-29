@@ -1,4 +1,6 @@
 # vmc_core.py - engine that knows nothing about the ansatz Ψ
+# old version
+
 import numpy as np
 from moire_model import L, hbar2_over_2m # (box length) # L
 
