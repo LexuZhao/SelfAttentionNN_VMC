@@ -1,10 +1,5 @@
 # moire_model.py # latex notes in colab
 
-# This code computes the total static energy (in meV) of a set of unit‐charges (e.g. electrons) 
-# in a 2D moiré superlattice: the energy_static(R) function takes an array of particle positions 
-# R (in nm) and returns the sum of the external moiré potential energy and the electron–electron 
-# Coulomb repulsion (via a 2D Ewald summation under periodic boundary conditions).
-
 from math import erfc, sqrt, pi, exp
 import numpy as np
 
@@ -26,22 +21,14 @@ r_cut    = 2.5       # real-space cutoff in L units
 k_cut    = 5         # k-space cutoff in 2π/L units
 L     = n_sup * a_m  # nm   PBC box length used in Ewald
 
-# 1. primitive real-space moiré lattice
-# def a_vectors(a_m):
-#     a1 = a_m * np.array([1.0, 0.0])
-#     a2 = a_m * np.array([0.5, np.sqrt(3.0)/2])
-#     return a1, a2
-
-# primitive real lattice vectors
-def a_vectors(a_m):
+def a_vectors(a_m): # real supercell lattice vectors
     """Generates the 3 shortest moiré reciprocal vectors G_1,2,3, 60° apart, six-fold symmetry"""
     a1 = a_m * np.array([1.0,                0.0           ])
     a2 = a_m * np.array([0.5,  np.sqrt(3.0) / 2.0          ])
     a3 = -(a1 + a2)        # optional third vector (120° w.r.t. a1)
     return [a1, a2, a3]    # same interface style as your b_vectors()
 
-
-def b_vectors(a_m):
+def b_vectors(a_m): # reciprocal supercell lattice vectors
     """from paper: g_j = (4*pi / sqrt(3) / a_m) * [cos(2*pi*j/3), sin(2*pi*j/3)], for j=1,2,3"""
     g_list = []
     prefac = 4 * np.pi / (np.sqrt(3) * a_m)
@@ -52,18 +39,6 @@ def b_vectors(a_m):
     print("g list", g_list)
     return g_list  # returns [g1, g2, g3]
 
-# real-space vectors of an n×n super-cell   (n = 3 here since we have 3x3 supercell)
-def supercell_vectors(n, a_m):
-    a1, a2 = a_vectors(a_m)
-    return n*a1, n*a2
-
-# def moire_potential(r):
-#     """V_ext(r) = V0 * Σ cos(G·r)  (sum over G vectors)"""
-#     G = np.array([b_vectors(a_m)[0], b_vectors(a_m)[1], b_vectors(a_m)[2]]) # 3 G vectors
-
-#     return - 2 * V0 * np.sum(np.cos(r @ G.T), axis=-1)
-
-
 def moire_potential(r, a_m = a_m, V0 = V0, phi = phi):
     """ V(r) = -2*V0*sum_{j=1}^{3} cos(g_j · r + phi)where g_j are 3 reciprocal lattice vectors (from paper)."""
     G = np.array(b_vectors(a_m))  # Get the three reciprocal vectors, shape (3,2)
@@ -71,8 +46,7 @@ def moire_potential(r, a_m = a_m, V0 = V0, phi = phi):
     one_electron_moire = -2 * V0 * np.sum(np.cos(phase), axis=-1)
     return np.sum(one_electron_moire)
 
-
-# ---------- Ewald helpers (using ew_alpha) ----------
+# ---------- Interaction part ----------
 def pairwise_real_space(R, alpha=ew_alpha, r_lim=r_cut, L=L):
     """ Short‐range (real‐space) Ewald sum (equation A6 from the paper):
     E_real = ½ ∑_{i≠j} ∑_L erfc(√α·r_{ij}^L) / r_{ij}^L., 
@@ -115,7 +89,6 @@ def self_energy(N, alpha=ew_alpha):
     Here q_i are unit charges, so E_self = -N·(√α/√π)."""
     return -sqrt(alpha/pi)*N
 
-# ξ_M : configuration-independent Madelung constant
 def madelung_offset(alpha=ew_alpha,                 # α = 1/(4η²)
                     r_lim=r_cut, k_lim=k_cut, L=L):
     """ Compute ξ_M in Eq. (A12) Returns a scalar (dimensionless).  Multiply by e²/4πϵ₀ϵ_r later."""
@@ -148,15 +121,6 @@ def madelung_offset(alpha=ew_alpha,                 # α = 1/(4η²)
     return rsum + ksum - xi0_L     # ---- ξ_M (Eq. A12)
 
 ξ_M = madelung_offset() * e2_4pieps0 / eps_r # compute once and store — units:   meV
-# ------------------------------------------------------------------
-
-# def coulomb_ewald_2D(R):
-#     """Full 2D Ewald Coulomb energy for N unit charges in a square PBC box:
-#     E_total = (e²/(4πϵ₀ ε_r))·( E_real + E_recip + E_self );  R : (N,2) array of positions [nm]; returns energy [meV]."""
-#     N=len(R)
-#     E = pairwise_real_space(R)+reciprocal_space(R)+self_energy(N)
-#     return E*e2_4pieps0/eps_r
-
 
 def coulomb_ewald_2D(R):
     """
@@ -174,13 +138,10 @@ def coulomb_ewald_2D(R):
     return E_config + 0.5 * N * ξ_M
 
 
-
-# ---------- public function ----------
 def energy_static(R):
     """V_ext + V_ee  (independent of Ψ)."""
     return moire_potential(R) + coulomb_ewald_2D(R)
 
-# alias for backward compatibility
 energy_moire = energy_static
 
 
